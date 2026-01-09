@@ -185,45 +185,50 @@ namespace Sharphound.Runtime
             if (File.Exists(resolvedFileName))
                 resolvedFileName = _context.ResolveFileName(Path.GetRandomFileName(), "zip", true);
 
-            using var fs = File.Create(resolvedFileName);
-            using var zipStream = new ZipOutputStream(fs);
-            zipStream.SetLevel(9);
-
-            if (_context.ZipPassword != null) zipStream.Password = _context.ZipPassword;
-
-            var fileList = new List<string>();
-            fileList.AddRange(new[]
+            using (var fs = File.Create(resolvedFileName))
+            using (var zipStream = new ZipOutputStream(fs))
             {
-                _computerOutput.GetFilename(), _userOutput.GetFilename(), _groupOutput.GetFilename(),
-                _containerOutput.GetFilename(), _domainOutput.GetFilename(), _gpoOutput.GetFilename(),
-                _ouOutput.GetFilename(), _rootCAOutput.GetFilename(), _aIACAOutput.GetFilename(),
-                _enterpriseCAOutput.GetFilename(), _nTAuthStoreOutput.GetFilename(),
-                _certTemplateOutput.GetFilename(),_issuancePolicyOutput.GetFilename()
-            });
+                zipStream.SetLevel(9);
 
-            foreach (var entry in fileList.Where(x => !string.IsNullOrEmpty(x)))
-            {
-                var fi = new FileInfo(entry);
-                var zipEntry = new ZipEntry(fi.Name) { DateTime = fi.LastWriteTime, Size = fi.Length };
-                zipStream.PutNextEntry(zipEntry);
-                
-                using (var fileStream = File.OpenRead(entry))
-                {
-                    StreamUtils.Copy(fileStream, zipStream, new byte[4096]);
-                }
+                if (_context.ZipPassword != null) zipStream.Password = _context.ZipPassword;
 
-                try
+                var fileList = new List<string>();
+                fileList.AddRange(new[]
                 {
-                    zipStream.CloseEntry();
-                    File.Delete(entry);
-                }
-                catch (Exception e)
+                    _computerOutput.GetFilename(), _userOutput.GetFilename(), _groupOutput.GetFilename(),
+                    _containerOutput.GetFilename(), _domainOutput.GetFilename(), _gpoOutput.GetFilename(),
+                    _ouOutput.GetFilename(), _rootCAOutput.GetFilename(), _aIACAOutput.GetFilename(),
+                    _enterpriseCAOutput.GetFilename(), _nTAuthStoreOutput.GetFilename(),
+                    _certTemplateOutput.GetFilename(),_issuancePolicyOutput.GetFilename()
+                });
+
+                foreach (var entry in fileList.Where(x => !string.IsNullOrEmpty(x)))
                 {
-                    _context.Logger.LogError(e, "Error adding {Filename} to the zip", entry);
+                    var fi = new FileInfo(entry);
+                    var zipEntry = new ZipEntry(fi.Name) { DateTime = fi.LastWriteTime, Size = fi.Length };
+                    zipStream.PutNextEntry(zipEntry);
+                    
+                    using (var fileStream = File.OpenRead(entry))
+                    {
+                        StreamUtils.Copy(fileStream, zipStream, new byte[4096]);
+                    }
+
+                    try
+                    {
+                        zipStream.CloseEntry();
+                        File.Delete(entry);
+                    }
+                    catch (Exception e)
+                    {
+                        _context.Logger.LogError(e, "Error adding {Filename} to the zip", entry);
+                    }
                 }
             }
 
-            return resolvedFileName;
+            if (_context.Flags.Loop)
+                return resolvedFileName;
+
+            return ZipEncryptor.EncryptZip(resolvedFileName, _context.Logger);
         }
     }
 }

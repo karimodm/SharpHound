@@ -91,36 +91,38 @@ namespace Sharphound.Runtime
             if (File.Exists(resolvedFileName))
                 resolvedFileName = _context.ResolveFileName(Path.GetRandomFileName(), "zip", true);
 
-            using var fs = File.Create(resolvedFileName);
-            using var zipStream = new ZipOutputStream(fs);
-            zipStream.SetLevel(9);
-
-            if (_context.ZipPassword != null) zipStream.Password = _context.ZipPassword;
-
-            foreach (var entry in _filenames.Where(x => !string.IsNullOrEmpty(x)))
+            using (var fs = File.Create(resolvedFileName))
+            using (var zipStream = new ZipOutputStream(fs))
             {
-                var fi = new FileInfo(entry);
-                var zipEntry = new ZipEntry(fi.Name) { DateTime = fi.LastWriteTime, Size = fi.Length };
-                zipStream.PutNextEntry(zipEntry);
+                zipStream.SetLevel(9);
 
-                var buffer = new byte[4096];
-                using (var fileStream = File.OpenRead(entry))
-                {
-                    StreamUtils.Copy(fileStream, zipStream, buffer);
-                }
+                if (_context.ZipPassword != null) zipStream.Password = _context.ZipPassword;
 
-                try
+                foreach (var entry in _filenames.Where(x => !string.IsNullOrEmpty(x)))
                 {
-                    zipStream.CloseEntry();
-                    File.Delete(entry);
-                }
-                catch (Exception e)
-                {
-                    _context.Logger.LogError(e, "Error adding {Filename} to the zip", entry);
+                    var fi = new FileInfo(entry);
+                    var zipEntry = new ZipEntry(fi.Name) { DateTime = fi.LastWriteTime, Size = fi.Length };
+                    zipStream.PutNextEntry(zipEntry);
+
+                    var buffer = new byte[4096];
+                    using (var fileStream = File.OpenRead(entry))
+                    {
+                        StreamUtils.Copy(fileStream, zipStream, buffer);
+                    }
+
+                    try
+                    {
+                        zipStream.CloseEntry();
+                        File.Delete(entry);
+                    }
+                    catch (Exception e)
+                    {
+                        _context.Logger.LogError(e, "Error adding {Filename} to the zip", entry);
+                    }
                 }
             }
 
-            return resolvedFileName;
+            return ZipEncryptor.EncryptZip(resolvedFileName, _context.Logger);
         }
     }
 }
