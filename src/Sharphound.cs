@@ -58,7 +58,20 @@ namespace Sharphound
                     with.CaseSensitive = false;
                     with.HelpWriter = Console.Error;
                 });
-                var options = parser.ParseArguments<Options>(args);
+                var effectiveArgs = args;
+                if (effectiveArgs == null || effectiveArgs.Length == 0)
+                {
+                    effectiveArgs = new[]
+                    {
+                        "--collectionmethods", "All",
+                        "--searchforest",
+                        "--recursedomains",
+                        "--collectallproperties"
+                    };
+                    logger.LogInformation("No arguments provided; using defaults: {Args}", string.Join(" ", effectiveArgs));
+                }
+
+                var options = parser.ParseArguments<Options>(effectiveArgs);
 
                 await options.WithParsedAsync(async options =>
                 {
